@@ -1,0 +1,27 @@
+{
+  "name": "reverse-shopping-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Reverse Shopping Recipe App",
+  "main": "index.js",
+  "scripts": {
+    "build": "echo 'No build step required for backend'",
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "mongoose": "^8.16.0",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["recipe", "api", "express", "mongodb"],
+  "author": "",
+  "license": "ISC"
+} 

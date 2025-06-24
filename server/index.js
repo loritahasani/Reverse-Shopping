@@ -9,13 +9,14 @@ const savedRecipeRoutes = require('./routes/savedRecipeRoute');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+
 // Middleware
 app.use(cors({
-  origin: [
-    'https://reverse-shopping-1.onrender.com',
-    'http://localhost:3000'
-  ]
+  origin: ['https://reverse-shopping-1.onrender.com', 'http://localhost:3000'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
 }));
+
 app.use(express.json());
 
 // Serve static files from the images directory

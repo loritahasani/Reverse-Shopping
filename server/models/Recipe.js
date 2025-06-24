@@ -1,19 +1,17 @@
-// server/models/Recipe.js
 const mongoose = require('mongoose');
 
 // Schema that matches the exact structure in MongoDB recetas collection
 const recipeSchema = new mongoose.Schema({
   id: String,
   name: String,
-  perberesit: [String], // ingredients in Albanian
+  perberesit: [String],
   instructions: String,
   image: String
-}, { 
-  // This tells Mongoose not to add __v field and to use the existing _id
+}, {
   versionKey: false,
-  // This tells Mongoose not to transform the _id field
-  id: false
+  id: false,
+  collection: 'recetas' // 👈 kjo është mënyra e saktë për të lidhur me koleksionin 'recetas'
 });
 
-// Use 'recetas' as the collection name to match your existing MongoDB collection
-module.exports = mongoose.model('recetas', recipeSchema);
+// Krijon modelin me emër 'Recipe', por lidhet me koleksionin 'recetas'
+module.exports = mongoose.model('Recipe', recipeSchema);

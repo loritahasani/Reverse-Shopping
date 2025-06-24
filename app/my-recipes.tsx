@@ -10,7 +10,6 @@ import {
     FlatList,
     Image,
     ImageBackground,
-    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -76,7 +75,7 @@ export default function MyRecipesScreen() {
     const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
     const getApiBaseUrl = () => {
-        return Platform.OS === 'android' ? 'http://10.0.2.2:5000' : 'http://localhost:5000';
+        return 'https://reverse-shopping-hiq9.onrender.com';
     };
 
     const loadSavedData = useCallback(async () => {
@@ -697,7 +696,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: Platform.OS === 'ios' ? 50 : 40,
+        paddingTop: 50,
         paddingBottom: 15,
         paddingHorizontal: 15,
         marginBottom: 20,

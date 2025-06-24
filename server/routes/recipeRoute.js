@@ -26,6 +26,36 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Create a new recipe
+router.post('/', async (req, res) => {
+  try {
+    console.log('POST / - Creating new recipe');
+    console.log('Recipe data:', req.body);
+    
+    const { name, perberesit, instructions, image } = req.body;
+    
+    // Validate required fields
+    if (!name || !perberesit || !instructions) {
+      return res.status(400).json({ error: 'Name, ingredients, and instructions are required' });
+    }
+    
+    // Create new recipe
+    const newRecipe = new Recipe({
+      name,
+      perberesit: Array.isArray(perberesit) ? perberesit : [perberesit],
+      instructions,
+      image: image || null
+    });
+    
+    await newRecipe.save();
+    console.log(`Recipe created: ${name}`);
+    res.status(201).json(newRecipe);
+  } catch (error) {
+    console.error('Error creating recipe:', error);
+    res.status(500).json({ error: 'Failed to create recipe' });
+  }
+});
+
 // Enhanced search functionality - search by title and ingredients, handle diacritics
 router.get('/search', async (req, res) => {
   const query = req.query.q?.split(',') || [];
@@ -120,6 +150,30 @@ router.get('/:id', async (req, res) => {
     res.json(recipe);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch recipe' });
+  }
+});
+
+// Update recipe by ID
+router.patch('/:id', async (req, res) => {
+  try {
+    console.log(`PATCH /${req.params.id} - Updating recipe`);
+    console.log('Update data:', req.body);
+    
+    const recipe = await Recipe.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+    
+    if (!recipe) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+    
+    console.log(`Recipe updated: ${recipe.name}`);
+    res.json(recipe);
+  } catch (error) {
+    console.error('Error updating recipe:', error);
+    res.status(500).json({ error: 'Failed to update recipe' });
   }
 });
 

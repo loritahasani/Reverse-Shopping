@@ -200,7 +200,7 @@ const SAVED_MEAL_PLANS_KEY = '@saved_meal_plans';
 
 // API base URL - adjust based on platform
 const getApiBaseUrl = () => {
-  return 'https://reverse-shopping-api.onrender.com';
+  return 'https://reverse-shopping-hiq9.onrender.com';
 };
 
 const kerkoReceta = async (ingredients: string): Promise<Recipe[]> => {

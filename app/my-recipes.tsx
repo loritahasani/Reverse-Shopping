@@ -65,9 +65,14 @@ export default function MyRecipesScreen() {
     const [activeTab, setActiveTab] = useState<'recipes' | 'mealPlans'>('recipes');
     const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
-    const getApiBaseUrl = () => {
-        return 'https://reverse-shopping-api.onrender.com';
-    };
+   const getApiBaseUrl = () => {
+  if (__DEV__) {
+    return 'http://localhost:5000'; // ose porti ku e ke backend-in lokal
+  } else {
+    return 'https://reverse-shopping-api.onrender.com'; // backend i deploy-uar
+  }
+};
+
 
     const loadSavedData = useCallback(async () => {
         setIsLoading(true);

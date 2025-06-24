@@ -82,6 +82,7 @@ export default function TabsLayout() {
 
             <Tabs.Screen name="auth" options={{ href: null }} />
             <Tabs.Screen name="layout" options={{ href: null }} />
+            <Tabs.Screen name="firebase" options={{ href: null }} />
         </Tabs>
     );
 }

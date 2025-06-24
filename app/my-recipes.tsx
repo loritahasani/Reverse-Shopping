@@ -55,6 +55,16 @@ const albanianDays = {
   Sunday: 'E Diel'
 };
 
+const englishDays = {
+  'E Hënë': 'Monday',
+  'E Martë': 'Tuesday',
+  'E Mërkurë': 'Wednesday',
+  'E Enjte': 'Thursday',
+  'E Premte': 'Friday',
+  'E Shtunë': 'Saturday',
+  'E Diel': 'Sunday'
+};
+
 export default function MyRecipesScreen() {
     const router = useRouter();
     const [savedRecipes, setSavedRecipes] = useState<Recipe[]>([]);
@@ -65,14 +75,9 @@ export default function MyRecipesScreen() {
     const [activeTab, setActiveTab] = useState<'recipes' | 'mealPlans'>('recipes');
     const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
-   const getApiBaseUrl = () => {
-  if (__DEV__) {
-    return 'http://localhost:5000'; // ose porti ku e ke backend-in lokal
-  } else {
-    return 'https://reverse-shopping-hiq9.onrender.com'; // backend i deploy-uar
-  }
-};
-
+    const getApiBaseUrl = () => {
+        return Platform.OS === 'android' ? 'http://10.0.2.2:5000' : 'http://localhost:5000';
+    };
 
     const loadSavedData = useCallback(async () => {
         setIsLoading(true);
@@ -143,12 +148,21 @@ export default function MyRecipesScreen() {
             const storedMealPlans = await AsyncStorage.getItem(`${SAVED_MEAL_PLANS_KEY}_${currentUser.uid}`);
             if (storedMealPlans) {
                 const parsedMealPlans = JSON.parse(storedMealPlans);
-                // Ensure meal plans have proper structure
-                const validatedMealPlans = parsedMealPlans.map((plan: any) => ({
-                    ...plan,
-                    plan: plan.plan || {},
-                    name: plan.name || 'Plan i padeklaruar'
-                }));
+                // Convert English day names to Albanian for display
+                const validatedMealPlans = parsedMealPlans.map((plan: any) => {
+                    const convertedPlan: any = {};
+                    if (plan.plan) {
+                        Object.keys(plan.plan).forEach(day => {
+                            const albanianDay = albanianDays[day as keyof typeof albanianDays] || day;
+                            convertedPlan[albanianDay] = plan.plan[day];
+                        });
+                    }
+                    return {
+                        ...plan,
+                        plan: convertedPlan,
+                        name: plan.name || 'Plan i padeklaruar'
+                    };
+                });
                 setSavedMealPlans(validatedMealPlans);
             }
 
@@ -307,7 +321,7 @@ export default function MyRecipesScreen() {
     const renderMealPlanDetail = () => {
         if (!viewingMealPlan) return null;
         
-        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const days = Object.keys(viewingMealPlan.plan || {});
         
         return (
             <ScrollView style={styles.detailScrollContainer} contentContainerStyle={styles.scrollContentContainer}>
@@ -329,7 +343,7 @@ export default function MyRecipesScreen() {
                 <View style={styles.mealPlanDetailContainer}>
                     {days.map(day => (
                         <View key={day} style={styles.mealPlanDayContainer}>
-                            <Text style={styles.mealPlanDayTitle}>{albanianDays[day as keyof typeof albanianDays]}</Text>
+                            <Text style={styles.mealPlanDayTitle}>{day}</Text>
                             
                             {viewingMealPlan.plan[day]?.breakfast && (
                                 <TouchableOpacity 

@@ -6,22 +6,22 @@ import { useRouter } from "expo-router";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Dimensions,
-  FlatList,
-  Image,
-  ImageBackground,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Dimensions,
+    FlatList,
+    Image,
+    ImageBackground,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { auth } from './firebase';
 
@@ -200,7 +200,7 @@ const SAVED_MEAL_PLANS_KEY = '@saved_meal_plans';
 
 // API base URL - adjust based on platform
 const getApiBaseUrl = () => {
-  return 'https://reverse-shopping-hiq9.onrender.com/recipes';
+  return 'https://reverse-shopping-hiq9.onrender.com';
 };
 
 const kerkoReceta = async (ingredients: string): Promise<Recipe[]> => {

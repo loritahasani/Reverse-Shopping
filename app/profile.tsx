@@ -4,33 +4,33 @@ import axios from 'axios';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import {
-  createUserWithEmailAndPassword,
-  EmailAuthProvider,
-  onAuthStateChanged,
-  reauthenticateWithCredential,
-  signInWithEmailAndPassword,
-  signOut,
-  updateEmail,
-  updateProfile,
+    createUserWithEmailAndPassword,
+    EmailAuthProvider,
+    onAuthStateChanged,
+    reauthenticateWithCredential,
+    signInWithEmailAndPassword,
+    signOut,
+    updateEmail,
+    updateProfile,
 } from 'firebase/auth';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  ImageBackground,
-  Modal,
-  Platform,
-  KeyboardAvoidingView as RNKeyboardAvoidingView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    Image,
+    ImageBackground,
+    Modal,
+    Platform,
+    KeyboardAvoidingView as RNKeyboardAvoidingView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { auth, storage } from './firebase';
 
@@ -361,7 +361,7 @@ const ProfileScreen = () => {
       }
 
       const getApiBaseUrl = () => {
-        return 'https://reverse-shopping-api.onrender.com';
+        return 'https://reverse-shopping-hiq9.onrender.com';
       };
 
       const apiUrl = `${getApiBaseUrl()}/recipes`;

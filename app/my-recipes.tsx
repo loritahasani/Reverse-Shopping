@@ -69,7 +69,7 @@ export default function MyRecipesScreen() {
   if (__DEV__) {
     return 'http://localhost:5000'; // ose porti ku e ke backend-in lokal
   } else {
-    return 'https://reverse-shopping-api.onrender.com'; // backend i deploy-uar
+    return 'https://reverse-shopping-hiq9.onrender.com'; // backend i deploy-uar
   }
 };
 

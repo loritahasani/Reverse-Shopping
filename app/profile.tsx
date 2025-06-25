@@ -165,36 +165,57 @@ const ProfileScreen = () => {
   // Handle recipe image selection
   const pickRecipeImage = async () => {
     try {
+      console.log('Requesting media library permissions...');
       // Request permission to access the media library
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (status !== 'granted') {
-        Alert.alert('Leje e mohuar', 'Na duhet leje për të aksesuar galerinë e fotos.');
+        console.log('Permission denied for media library');
+        Alert.alert(
+          'Leje e nevojshme', 
+          'Na duhet leje për të aksesuar galerinë e fotos për të shtuar foto në recetat tuaja. Ju mund të ndryshoni këtë në cilësimet e aplikacionit.',
+          [
+            { text: 'Anulo', style: 'cancel' },
+            { text: 'Hap cilësimet', onPress: () => {
+              // On web, we can't open settings, so just show instructions
+              if (Platform.OS === 'web') {
+                Alert.alert('Cilësimet', 'Ju lutem hapni cilësimet e shfletuesit dhe jepni leje për aksesin në galeri.');
+              }
+            }}
+          ]
+        );
         return;
       }
 
+      console.log('Permission granted, launching image picker...');
       // Launch the image picker
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaType.IMAGE,
         allowsEditing: true,
         aspect: [16, 9],
         quality: 0.7,
       });
 
+      console.log('Image picker result:', result);
       // Check if an image was selected
       if (!result.canceled && result.assets && result.assets.length > 0) {
         // Set the selected image URI
         setRecipeImage(result.assets[0].uri);
+        console.log('Image selected:', result.assets[0].uri);
+      } else {
+        console.log('No image selected or picker was canceled');
       }
     } catch (error) {
       console.error('Error picking recipe image:', error);
-      Alert.alert('Gabim', 'Ndodhi një gabim gjatë zgjedhjes së fotos.');
+      Alert.alert('Gabim', 'Ndodhi një gabim gjatë zgjedhjes së fotos. Ju lutem provoni përsëri.');
     }
   };
 
   // Optimized recipe image upload to Firebase Storage
   const uploadRecipeImage = async (uri: string): Promise<string> => {
     try {
+      console.log('Starting image upload process for URI:', uri);
+      
       if (!user?.uid) {
         throw new Error('User ID not available');
       }
@@ -203,10 +224,13 @@ const ProfileScreen = () => {
       const fileExtension = uri.split('.').pop() || 'jpg';
       const fileName = `recipe_${user.uid}_${Date.now()}.${fileExtension}`;
       const storageRef = ref(storage, `recipe_images/${fileName}`);
+      
+      console.log('Created storage reference:', fileName);
 
       // Optimize image before upload if possible
       let optimizedUri = uri;
       try {
+        console.log('Optimizing image...');
         // Use ImageManipulator to resize and compress the image for faster upload
         const manipResult = await ImageManipulator.manipulateAsync(
           uri,
@@ -214,26 +238,37 @@ const ProfileScreen = () => {
           { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG } // Compress to reduce size
         );
         optimizedUri = manipResult.uri;
+        console.log('Image optimized successfully');
       } catch (manipError) {
         console.log('Image optimization skipped:', manipError);
         // Continue with original image if optimization fails
       }
 
+      console.log('Creating blob from image...');
       // Create a blob from the image URI
       const response = await fetch(optimizedUri);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+      }
+      
       const blob = await response.blob();
+      console.log('Blob created, size:', blob.size);
 
-      // Upload the blob to Firebase Storage with higher quality setting
+      console.log('Uploading to Firebase Storage...');
+      // Upload the blob to Firebase Storage
       const uploadResult = await uploadBytes(storageRef, blob, {
         contentType: `image/${fileExtension}`
       });
 
       if (!uploadResult) {
-        throw new Error('Upload failed');
+        throw new Error('Upload failed - no result returned');
       }
 
+      console.log('Upload successful, getting download URL...');
       // Get the download URL for the uploaded image
       const downloadURL = await getDownloadURL(storageRef);
+      console.log('Download URL obtained:', downloadURL);
+      
       return downloadURL || '';
     } catch (error) {
       console.error('Error uploading recipe image:', error);
@@ -341,20 +376,19 @@ const ProfileScreen = () => {
         imageUploadPromise = (async () => {
           try {
             console.log('Starting image processing and upload');
-            // Optimize image before upload
-            const manipResult = await ImageManipulator.manipulateAsync(
-              recipeImage,
-              [{ resize: { width: 800, height: 800 } }], // Smaller size to reduce upload issues
-              { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-            );
-
-            console.log('Image processed successfully, but skipping Firebase upload due to CORS issues');
-            // Return a placeholder image URL for testing
-            return 'https://via.placeholder.com/300x200?text=Recipe+Image+Placeholder';
+            // Use the uploadRecipeImage function to actually upload to Firebase
+            const imageUrl = await uploadRecipeImage(recipeImage);
+            console.log('Image uploaded successfully:', imageUrl);
+            return imageUrl;
           } catch (error) {
             console.error('Error processing or uploading image:', error);
             console.log('Continuing recipe save without image');
-            // Don't show alert, just continue without image
+            // Show a warning but don't stop the recipe save process
+            Alert.alert(
+              'Vërejtje',
+              'Fotoja nuk u ngarkua, por receta do të ruhet pa foto.',
+              [{ text: 'Në rregull', style: 'default' }]
+            );
             return null; // Continue without image if upload fails
           }
         })();
@@ -455,7 +489,12 @@ const ProfileScreen = () => {
             serverRecipe.image = imageUrl.value;
           } catch (error) {
             console.error('Error updating recipe with image URL:', error);
+            // Don't fail the entire process if image update fails
+            console.log('Continuing without image update');
           }
+        } else if (imageUrl.status === 'rejected') {
+          console.log('Image upload failed, but recipe will be saved without image');
+          // Recipe will be saved without image, which is fine
         }
 
         try {
@@ -505,9 +544,13 @@ const ProfileScreen = () => {
           const checkFlag = await AsyncStorage.getItem('force_refresh_recipes');
           console.log('Verified force_refresh_recipes flag is:', checkFlag);
 
+          const imageStatus = imageUrl.status === 'fulfilled' && imageUrl.value 
+            ? 'me foto' 
+            : 'pa foto (ngarkimi i fotos dështoi)';
+
           Alert.alert(
             'Sukses!',
-            'Receta juaj u ruajt me sukses dhe tani është e disponueshme në profilin tuaj.',
+            `Receta juaj u ruajt me sukses ${imageStatus} dhe tani është e disponueshme në profilin tuaj.`,
             [{ text: 'Në rregull', style: 'default' }]
           );
 
@@ -639,7 +682,7 @@ const ProfileScreen = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaType.IMAGE,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.7,

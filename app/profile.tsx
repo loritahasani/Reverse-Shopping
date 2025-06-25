@@ -408,10 +408,24 @@ const ProfileScreen = () => {
       let isOfflineMode = false;
 
       console.log('Starting API post and image upload in parallel');
+      
+      // First, wait for image upload to complete
+      let uploadedImageUrl = null;
+      if (imageUploadPromise) {
+        try {
+          uploadedImageUrl = await imageUploadPromise;
+          console.log('Image upload completed successfully:', uploadedImageUrl);
+        } catch (error) {
+          console.log('Image upload failed, continuing without image:', error);
+          uploadedImageUrl = null;
+        }
+      }
+
+      // Now create the recipe with the image URL
       const results = await Promise.allSettled([
-        imageUploadPromise,
         axios.post(apiUrl, {
           ...recipeData,
+          image: uploadedImageUrl, // Include image URL in the initial POST request
         }, {
           timeout: 5000,
           headers: {
@@ -427,8 +441,7 @@ const ProfileScreen = () => {
         })
       ]);
 
-      const imageUrl = results[0];
-      const apiResponse = results[1];
+      const apiResponse = results[0];
 
       if (apiResponse.status === 'fulfilled') {
         console.log('API Response Status:', apiResponse.value.status);
@@ -440,13 +453,11 @@ const ProfileScreen = () => {
         }
       }
 
-      console.log('Image upload result:', JSON.stringify(imageUrl));
+      console.log('Image upload result:', JSON.stringify(uploadedImageUrl));
       console.log('API response:', JSON.stringify(apiResponse));
 
       if ((apiResponse.status === 'fulfilled' &&
         (apiResponse.value?.status === 201 || apiResponse.value?.status === 200)) || isOfflineMode) {
-
-        const uploadedImageUrl = imageUrl.status === 'fulfilled' ? imageUrl.value : null;
 
         let serverRecipe: any;
 
@@ -477,22 +488,22 @@ const ProfileScreen = () => {
           throw new Error('Server returned empty recipe data');
         }
 
-        if (imageUrl.status === 'fulfilled' && imageUrl.value) {
-          console.log('Image upload succeeded, updating recipe with URL:', imageUrl.value);
+        if (uploadedImageUrl) {
+          console.log('Image upload succeeded, updating recipe with URL:', uploadedImageUrl);
           try {
             const recipeId = serverRecipe.id || serverRecipe._id;
-            console.log(`Updating recipe ${recipeId} with image URL:`, imageUrl.value);
+            console.log(`Updating recipe ${recipeId} with image URL:`, uploadedImageUrl);
             const patchResponse = await axios.patch(`${apiUrl}/${recipeId}`, {
-              image: imageUrl.value
+              image: uploadedImageUrl
             });
             console.log('Image PATCH response:', JSON.stringify(patchResponse.data));
-            serverRecipe.image = imageUrl.value;
+            serverRecipe.image = uploadedImageUrl;
           } catch (error) {
             console.error('Error updating recipe with image URL:', error);
             // Don't fail the entire process if image update fails
             console.log('Continuing without image update');
           }
-        } else if (imageUrl.status === 'rejected') {
+        } else if (uploadedImageUrl === null) {
           console.log('Image upload failed, but recipe will be saved without image');
           // Recipe will be saved without image, which is fine
         }
@@ -544,9 +555,7 @@ const ProfileScreen = () => {
           const checkFlag = await AsyncStorage.getItem('force_refresh_recipes');
           console.log('Verified force_refresh_recipes flag is:', checkFlag);
 
-          const imageStatus = imageUrl.status === 'fulfilled' && imageUrl.value 
-            ? 'me foto' 
-            : 'pa foto (ngarkimi i fotos dështoi)';
+          const imageStatus = uploadedImageUrl ? 'me foto' : 'pa foto (ngarkimi i fotos dështoi)';
 
           Alert.alert(
             'Sukses!',

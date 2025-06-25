@@ -12,8 +12,8 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-  origin: ['https://reverse-shopping-1.onrender.com', 'http://localhost:3000'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  origin: ['https://reverse-shopping-hiq9.onrender.com', 'https://reverse-shopping-1.onrender.com', 'http://localhost:3000', 'http://localhost:19006'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   credentials: true
 }));
 

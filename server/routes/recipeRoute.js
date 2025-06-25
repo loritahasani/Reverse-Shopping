@@ -31,28 +31,41 @@ router.post('/', async (req, res) => {
   try {
     console.log('POST / - Creating new recipe');
     console.log('Recipe data:', req.body);
+    console.log('Request headers:', req.headers);
     
-    const { name, perberesit, instructions, image } = req.body;
+    const { name, perberesit, instructions, image, userId, createdAt } = req.body;
     
     // Validate required fields
     if (!name || !perberesit || !instructions) {
+      console.log('Validation failed - missing required fields');
+      console.log('name:', name);
+      console.log('perberesit:', perberesit);
+      console.log('instructions:', instructions);
       return res.status(400).json({ error: 'Name, ingredients, and instructions are required' });
     }
     
+    console.log('Validation passed, creating recipe object');
     // Create new recipe
     const newRecipe = new Recipe({
       name,
       perberesit: Array.isArray(perberesit) ? perberesit : [perberesit],
       instructions,
-      image: image || null
+      image: image || null,
+      userId: userId || 'anonymous',
+      createdAt: createdAt || new Date().toISOString()
     });
     
+    console.log('Recipe object created:', newRecipe);
+    console.log('Saving to database...');
+    
     await newRecipe.save();
-    console.log(`Recipe created: ${name}`);
+    console.log(`Recipe created successfully: ${name}`);
+    console.log('Saved recipe:', newRecipe);
     res.status(201).json(newRecipe);
   } catch (error) {
     console.error('Error creating recipe:', error);
-    res.status(500).json({ error: 'Failed to create recipe' });
+    console.error('Error details:', error.message);
+    res.status(500).json({ error: 'Failed to create recipe', details: error.message });
   }
 });
 

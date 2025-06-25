@@ -6,7 +6,9 @@ const recipeSchema = new mongoose.Schema({
   name: String,
   perberesit: [String],
   instructions: String,
-  image: String
+  image: String,
+  userId: String,
+  createdAt: String
 }, {
   versionKey: false,
   id: false,

@@ -341,11 +341,13 @@ const mapApiRecipesToLocal = (apiRecipes: any[]): Recipe[] => {
       imageSource = recipeImageMap[recipe.name];
       console.log('Image mapped by name for:', recipe.name);
     }
-    else if (recipe.image && typeof recipe.image === 'string' && recipeImageMap[recipe.image]) {
+    else if (recipe.image && typeof recipe.image === 'string' && recipe.image.startsWith('http')) {
+      imageSource = { uri: recipe.image };
+      console.log('Using uploaded image URL for:', recipe.name, recipe.image);
+    } else if (recipe.image && typeof recipe.image === 'string' && recipeImageMap[recipe.image]) {
       imageSource = recipeImageMap[recipe.image];
       console.log('Image mapped by filename for:', recipe.name, recipe.image);
-    }
-    else {
+    } else {
       imageSource = require("../assets/images/recipedd.jpg");
       console.log('Using default image for:', recipe.name);
     }

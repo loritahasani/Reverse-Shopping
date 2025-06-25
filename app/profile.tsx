@@ -279,100 +279,60 @@ const ProfileScreen = () => {
   // Handle recipe submission with optimized performance
   const handlePublishRecipe = async () => {
     try {
-      // Debug message to verify function is being called
       console.log('handlePublishRecipe called');
-
-      // Set publishing state to show loading indicator
-      setPublishingRecipe(true);
-
-      // Enhanced validation with better user feedback
-      let validationErrors = [];
-
-      if (!recipeName.trim()) {
-        validationErrors.push('Emri i recetës është i detyrueshëm');
-      } else if (recipeName.trim().length < 3) {
-        validationErrors.push('Emri i recetës duhet të ketë të paktën 3 karaktere');
-      }
-
-      if (!recipeIngredients.trim()) {
-        validationErrors.push('Përbërësit janë të detyrueshëm');
-      } else {
-        const ingredientLines = recipeIngredients
-          .split('\n')
-          .map(item => item.trim())
-          .filter(item => item.length > 0);
-
-        if (ingredientLines.length < 2) {
-          validationErrors.push('Ju lutemi shtoni të paktën 2 përbërës');
-        }
-      }
-
-      if (!recipeInstructions.trim()) {
-        validationErrors.push('Udhëzimet e përgatitjes janë të detyrueshme');
-      } else if (recipeInstructions.trim().length < 20) {
-        validationErrors.push('Ju lutemi jepni udhëzime më të detajuara (të paktën 20 karaktere)');
-      }
-
-      if (validationErrors.length > 0) {
-        Alert.alert(
-          'Ju lutemi plotësoni të gjitha fushat',
-          validationErrors.join('\n')
-        );
-        setPublishingRecipe(false);
+      console.log('Recipe data:', { recipeName, recipeIngredients, recipeInstructions, recipeImage });
+      
+      console.log('Validating recipe data...');
+      console.log('recipeName.trim():', recipeName.trim());
+      console.log('recipeIngredients.trim():', recipeIngredients.trim());
+      console.log('recipeInstructions.trim():', recipeInstructions.trim());
+      console.log('recipeName.trim().length:', recipeName.trim().length);
+      console.log('recipeIngredients.trim().length:', recipeIngredients.trim().length);
+      console.log('recipeInstructions.trim().length:', recipeInstructions.trim().length);
+      
+      if (!recipeName.trim() || !recipeIngredients.trim() || !recipeInstructions.trim()) {
+        console.log('Validation failed - missing required fields');
+        Alert.alert('Gabim', 'Ju lutem plotësoni të gjitha fushat e detyrueshme.');
         return;
       }
 
-      // Create recipe object with sanitized data
+      console.log('Validation passed, checking user...');
+      if (!user) {
+        console.log('No user found');
+        Alert.alert('Gabim', 'Ju duhet të jeni të kyçur për të publikuar receta.');
+        return;
+      }
+
+      console.log('User found:', user.uid);
+      setPublishingRecipe(true);
+      console.log('Starting recipe publishing process...');
+
       const ingredientsArray = recipeIngredients
         .split('\n')
         .map(item => item.trim())
         .filter(item => item.length > 0);
 
+      if (ingredientsArray.length === 0) {
+        Alert.alert('Gabim', 'Ju lutem shtoni të paktën një përbërës.');
+        setPublishingRecipe(false);
+        return;
+      }
+
       const recipeData = {
         name: recipeName.trim(),
         perberesit: ingredientsArray,
         instructions: recipeInstructions.trim(),
-        image: null, // Will be updated if image upload succeeds
-        userId: user?.uid || 'anonymous',
-        createdAt: new Date().toISOString(),
+        userId: user.uid,
+        createdAt: new Date().toISOString()
       };
 
-      // Generate a temporary ID for local storage
+      console.log('Recipe data prepared:', recipeData);
+
       const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      const tempRecipe = {
-        ...recipeData,
-        id: tempId,
-      };
 
-      // Close modal immediately for better UX
-      setRecipeModalVisible(false);
-
-      // Save to local storage first for immediate feedback
-      let existingRecipes = [];
-      try {
-        const storedRecipes = await AsyncStorage.getItem('userRecipes');
-        if (storedRecipes) {
-          existingRecipes = JSON.parse(storedRecipes);
-        }
-      } catch (error) {
-        console.error('Error reading from AsyncStorage:', error);
-      }
-
-      existingRecipes.unshift(tempRecipe); // Add to beginning for better visibility
-      try {
-        await AsyncStorage.setItem('userRecipes', JSON.stringify(existingRecipes));
-      } catch (error) {
-        console.error('Error writing to AsyncStorage:', error);
-        Alert.alert('Gabim', 'Nuk mund të ruajmë recetat në ruajtjen lokale.');
-        return;
-      }
-
-      // Show a temporary toast or notification
-      Alert.alert('Duke ruajtur', 'Receta juaj po ruhet...');
-
-      // Handle image upload if present (in parallel with API submission)
-      let imageUploadPromise: Promise<string | null> = Promise.resolve(null);
+      let imageUploadPromise = null;
       if (recipeImage) {
+        console.log('Recipe image found, preparing upload...');
         imageUploadPromise = (async () => {
           try {
             console.log('Starting image processing and upload');
@@ -392,6 +352,8 @@ const ProfileScreen = () => {
             return null; // Continue without image if upload fails
           }
         })();
+      } else {
+        console.log('No recipe image selected');
       }
 
       const getApiBaseUrl = () => {
@@ -409,9 +371,10 @@ const ProfileScreen = () => {
 
       console.log('Starting API post and image upload in parallel');
       
-      // First, wait for image upload to complete
+      // First, wait for image upload to complete (if there is an image)
       let uploadedImageUrl = null;
       if (imageUploadPromise) {
+        console.log('Waiting for image upload to complete...');
         try {
           uploadedImageUrl = await imageUploadPromise;
           console.log('Image upload completed successfully:', uploadedImageUrl);
@@ -419,7 +382,11 @@ const ProfileScreen = () => {
           console.log('Image upload failed, continuing without image:', error);
           uploadedImageUrl = null;
         }
+      } else {
+        console.log('No image to upload, proceeding without image');
       }
+
+      console.log('About to create recipe with image URL:', uploadedImageUrl);
 
       // Now create the recipe with the image URL
       const results = await Promise.allSettled([
@@ -441,6 +408,7 @@ const ProfileScreen = () => {
         })
       ]);
 
+      console.log('API request completed, processing results...');
       const apiResponse = results[0];
 
       if (apiResponse.status === 'fulfilled') {

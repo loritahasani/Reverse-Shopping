@@ -190,7 +190,7 @@ const ProfileScreen = () => {
       console.log('Permission granted, launching image picker...');
       // Launch the image picker
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaType.IMAGE,
+        mediaTypes: 'images',
         allowsEditing: true,
         aspect: [16, 9],
         quality: 0.7,
@@ -682,7 +682,7 @@ const ProfileScreen = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaType.IMAGE,
+        mediaTypes: 'images',
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.7,

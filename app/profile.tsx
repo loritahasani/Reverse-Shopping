@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 import {
     createUserWithEmailAndPassword,
     EmailAuthProvider,
@@ -77,6 +78,8 @@ const ProfileScreen = () => {
   const [recipeInstructions, setRecipeInstructions] = useState('');
   const [recipeImage, setRecipeImage] = useState<string | null>(null);
   const [publishingRecipe, setPublishingRecipe] = useState(false);
+
+  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -523,12 +526,26 @@ const ProfileScreen = () => {
           const checkFlag = await AsyncStorage.getItem('force_refresh_recipes');
           console.log('Verified force_refresh_recipes flag is:', checkFlag);
 
-          const imageStatus = uploadedImageUrl ? 'me foto' : 'pa foto (ngarkimi i fotos dështoi)';
+          const imageStatus = uploadedImageUrl ? 'me foto' : 'pa foto';
 
           Alert.alert(
-            'Sukses!',
-            `Receta juaj u ruajt me sukses ${imageStatus} dhe tani është e disponueshme në profilin tuaj.`,
-            [{ text: 'Në rregull', style: 'default' }]
+            '🎉 Receta u Postua me Sukses!',
+            `Receta juaj "${recipeName.trim()}" u ruajt me sukses ${imageStatus} dhe tani është e disponueshme në profilin tuaj.\n\nJu mund ta gjeni në seksionin "Recetat e mia".`,
+            [
+              { 
+                text: 'Shiko Recetat e Mia', 
+                style: 'default',
+                onPress: () => {
+                  // Close the modal first
+                  setRecipeModalVisible(false);
+                  // Navigate to my recipes after a short delay
+                  setTimeout(() => {
+                    router.push('/my-recipes');
+                  }, 300);
+                }
+              },
+              { text: 'Mbyll', style: 'cancel' }
+            ]
           );
 
           setRecipeName('');
@@ -1206,7 +1223,30 @@ const ProfileScreen = () => {
               <View style={styles.modalButtonRow}>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => setRecipeModalVisible(false)}
+                  onPress={() => {
+                    if (recipeName.trim() || recipeIngredients.trim() || recipeInstructions.trim() || recipeImage) {
+                      Alert.alert(
+                        'Anulo krijimin e recetës',
+                        'A jeni të sigurt që dëshironi të anuloni? Të gjitha të dhënat do të humbasin.',
+                        [
+                          { text: 'Vazhdo', style: 'cancel' },
+                          { 
+                            text: 'Anulo', 
+                            style: 'destructive',
+                            onPress: () => {
+                              setRecipeModalVisible(false);
+                              setRecipeName('');
+                              setRecipeIngredients('');
+                              setRecipeInstructions('');
+                              setRecipeImage(null);
+                            }
+                          }
+                        ]
+                      );
+                    } else {
+                      setRecipeModalVisible(false);
+                    }
+                  }}
                   disabled={publishingRecipe}
                 >
                   <Text style={styles.cancelButtonText}>Anulo</Text>
@@ -1233,7 +1273,30 @@ const ProfileScreen = () => {
 
               <TouchableOpacity
                 style={styles.closeBtn}
-                onPress={() => setRecipeModalVisible(false)}
+                onPress={() => {
+                  if (recipeName.trim() || recipeIngredients.trim() || recipeInstructions.trim() || recipeImage) {
+                    Alert.alert(
+                      'Mbyll modalën',
+                      'A jeni të sigurt që dëshironi të mbyllni? Të gjitha të dhënat do të humbasin.',
+                      [
+                        { text: 'Vazhdo', style: 'cancel' },
+                        { 
+                          text: 'Mbyll', 
+                          style: 'destructive',
+                          onPress: () => {
+                            setRecipeModalVisible(false);
+                            setRecipeName('');
+                            setRecipeIngredients('');
+                            setRecipeInstructions('');
+                            setRecipeImage(null);
+                          }
+                        }
+                      ]
+                    );
+                  } else {
+                    setRecipeModalVisible(false);
+                  }
+                }}
                 disabled={publishingRecipe}
               >
                 <Ionicons name="close-circle" size={28} color="#007AFF" />

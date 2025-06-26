@@ -979,6 +979,29 @@ function HomePage({
                 style={styles.recipeImage}
                 imageStyle={styles.imageStyle}
               >
+                {/* Edit/Delete Buttons */}
+                {auth.currentUser && item.userId === auth.currentUser.uid && (
+                  <View style={styles.recipeCardActions}>
+                    <TouchableOpacity
+                      style={styles.cardEditButton}
+                      onPress={e => {
+                        e.stopPropagation();
+                        Alert.alert('Edit', 'Kjo do të hapë modalin për editim (implemento këtë logjikë).');
+                      }}
+                    >
+                      <Ionicons name="create-outline" size={20} color="#007AFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.cardDeleteButton}
+                      onPress={e => {
+                        e.stopPropagation();
+                        Alert.alert('Fshi', 'Kjo do të fshijë recetën (implemento këtë logjikë).');
+                      }}
+                    >
+                      <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                    </TouchableOpacity>
+                  </View>
+                )}
                 <TouchableOpacity
                   style={styles.heartButton}
                   onPress={(e) => {
@@ -2043,5 +2066,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 2,
+  },
+  recipeCardActions: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardEditButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+  },
+  cardDeleteButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.8)',
   },
 });

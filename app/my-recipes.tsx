@@ -593,20 +593,6 @@ export default function MyRecipesScreen() {
                         <Text style={styles.detailTitle} numberOfLines={1} ellipsizeMode='tail'>
                             {viewingRecipe.name}
                         </Text>
-                        <View style={styles.detailActionButtons}>
-                            <TouchableOpacity
-                                onPress={() => openEditModal(viewingRecipe)}
-                                style={styles.editButton}
-                            >
-                                <Ionicons name="create-outline" size={24} color="#007AFF" />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                onPress={() => handleUnsaveRecipe(viewingRecipe)}
-                                style={styles.deleteButton}
-                            >
-                                <Ionicons name="trash-outline" size={24} color="#FF3B30" />
-                            </TouchableOpacity>
-                        </View>
                     </View>
 
                     <View style={styles.detailContentWrapper}>
@@ -697,26 +683,6 @@ export default function MyRecipesScreen() {
                                                 style={styles.recipeImage}
                                                 imageStyle={styles.imageStyle}
                                             >
-                                                <View style={styles.recipeCardActions}>
-                                                    <TouchableOpacity
-                                                        style={styles.cardEditButton}
-                                                        onPress={(e) => {
-                                                            e.stopPropagation();
-                                                            openEditModal(item);
-                                                        }}
-                                                    >
-                                                        <Ionicons name="create-outline" size={20} color="#007AFF" />
-                                                    </TouchableOpacity>
-                                                    <TouchableOpacity
-                                                        style={styles.cardDeleteButton}
-                                                        onPress={(e) => {
-                                                            e.stopPropagation();
-                                                            handleUnsaveRecipe(item);
-                                                        }}
-                                                    >
-                                                        <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                                                    </TouchableOpacity>
-                                                </View>
                                                 <View style={styles.imageOverlay}>
                                                     <Text style={styles.recipeName} numberOfLines={2}>{item.name}</Text>
                                                     <View style={styles.recipeFooter}>

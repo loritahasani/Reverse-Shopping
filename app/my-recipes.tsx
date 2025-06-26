@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -10,9 +12,11 @@ import {
     FlatList,
     Image,
     ImageBackground,
+    Modal,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
@@ -73,6 +77,15 @@ export default function MyRecipesScreen() {
     const [viewingMealPlan, setViewingMealPlan] = useState<any | null>(null);
     const [activeTab, setActiveTab] = useState<'recipes' | 'mealPlans'>('recipes');
     const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+    
+    // Edit recipe state
+    const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
+    const [editModalVisible, setEditModalVisible] = useState(false);
+    const [editRecipeName, setEditRecipeName] = useState('');
+    const [editRecipeIngredients, setEditRecipeIngredients] = useState('');
+    const [editRecipeInstructions, setEditRecipeInstructions] = useState('');
+    const [editRecipeImage, setEditRecipeImage] = useState<string | null>(null);
+    const [isUpdatingRecipe, setIsUpdatingRecipe] = useState(false);
 
     const getApiBaseUrl = () => {
         return 'https://reverse-shopping-hiq9.onrender.com';
@@ -211,33 +224,204 @@ export default function MyRecipesScreen() {
     );
 
     const handleUnsaveRecipe = async (recipe: Recipe) => {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+            Alert.alert('Gabim', 'Ju duhet të jeni të kyçur për të fshirë receta.');
+            return;
+        }
+
+        Alert.alert(
+            'Fshi recetën',
+            `A jeni të sigurt që dëshironi të fshini recetën "${recipe.name}"?`,
+            [
+                { text: 'Anulo', style: 'cancel' },
+                {
+                    text: 'Fshi',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            // Remove from local storage
+                            const storedRecipes = await AsyncStorage.getItem(`${SAVED_RECIPES_KEY}_${currentUser.uid}`);
+                            if (storedRecipes) {
+                                const localRecipes = JSON.parse(storedRecipes);
+                                const updatedRecipes = localRecipes.filter((r: Recipe) => r.id !== recipe.id);
+                                await AsyncStorage.setItem(`${SAVED_RECIPES_KEY}_${currentUser.uid}`, JSON.stringify(updatedRecipes));
+                                setSavedRecipes(updatedRecipes);
+                            }
+
+                            // Remove from backend if it has a server ID
+                            if (recipe._id) {
+                                try {
+                                    await axios.delete(`${getApiBaseUrl()}/recipes/${recipe._id}`);
+                                    console.log('Recipe deleted from server');
+                                } catch (error) {
+                                    console.error('Failed to delete recipe from server:', error);
+                                }
+                            }
+
+                            if (viewingRecipe && viewingRecipe.id === recipe.id) {
+                                setViewingRecipe(null);
+                            }
+                        } catch (error) {
+                            console.error('Error deleting recipe:', error);
+                            Alert.alert('Gabim', 'Ndodhi një gabim gjatë fshirjes së recetës.');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    // Edit recipe functions
+    const openEditModal = (recipe: Recipe) => {
+        setEditingRecipe(recipe);
+        setEditRecipeName(recipe.name);
+        setEditRecipeIngredients(recipe.ingredients.join('\n'));
+        setEditRecipeInstructions(recipe.instructions);
+        setEditRecipeImage(recipe.image && typeof recipe.image === 'string' ? recipe.image : null);
+        setEditModalVisible(true);
+    };
+
+    const closeEditModal = () => {
+        setEditModalVisible(false);
+        setEditingRecipe(null);
+        setEditRecipeName('');
+        setEditRecipeIngredients('');
+        setEditRecipeInstructions('');
+        setEditRecipeImage(null);
+    };
+
+    const pickEditRecipeImage = async () => {
         try {
-            const currentUser = auth.currentUser;
-            if (!currentUser) return;
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Leje e nevojshme', 'Na duhet leje për të aksesuar galerinë e fotos.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: 'images',
+                allowsEditing: true,
+                aspect: [16, 9],
+                quality: 0.7,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                setEditRecipeImage(result.assets[0].uri);
+            }
+        } catch (error) {
+            console.error('Error picking image:', error);
+            Alert.alert('Gabim', 'Ndodhi një gabim gjatë zgjedhjes së fotos.');
+        }
+    };
+
+    const uploadEditRecipeImage = async (uri: string): Promise<string> => {
+        try {
+            const response = await fetch(uri);
+            const blob = await response.blob();
             
-            const storageKey = `${SAVED_RECIPES_KEY}_${currentUser.uid}`;
-            const storedValue = await AsyncStorage.getItem(storageKey);
-            let savedRecipesData = storedValue ? JSON.parse(storedValue) : [];
+            const storage = getStorage();
+            const imageRef = ref(storage, `recipe-images/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.jpg`);
+            
+            await uploadBytes(imageRef, blob);
+            const downloadURL = await getDownloadURL(imageRef);
+            return downloadURL;
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            throw error;
+        }
+    };
 
-            const updatedRecipes = savedRecipesData.filter((r: Recipe) => r.id !== recipe.id);
-            setSavedRecipes(updatedRecipes);
+    const handleUpdateRecipe = async () => {
+        if (!editingRecipe) return;
 
-            await AsyncStorage.setItem(storageKey, JSON.stringify(updatedRecipes));
-            await AsyncStorage.setItem(`${SAVED_RECIPES_KEY}_${currentUser.uid}_timestamp`, new Date().getTime().toString());
-                
-            if (recipe._id) {
+        if (!editRecipeName.trim() || !editRecipeIngredients.trim() || !editRecipeInstructions.trim()) {
+            Alert.alert('Gabim', 'Ju lutem plotësoni të gjitha fushat e detyrueshme.');
+            return;
+        }
+
+        setIsUpdatingRecipe(true);
+
+        try {
+            const ingredientsArray = editRecipeIngredients
+                .split('\n')
+                .map(item => item.trim())
+                .filter(item => item.length > 0);
+
+            if (ingredientsArray.length === 0) {
+                Alert.alert('Gabim', 'Ju lutem shtoni të paktën një përbërës.');
+                setIsUpdatingRecipe(false);
+                return;
+            }
+
+            let imageUrl = editingRecipe.image;
+            
+            // Upload new image if selected
+            if (editRecipeImage && editRecipeImage !== editingRecipe.image) {
                 try {
-                    await axios.delete(`${getApiBaseUrl()}/saved-recipes/${recipe._id}`);
-                } catch (backendError) {
-                    console.error('Failed to remove recipe from backend:', backendError);
+                    imageUrl = await uploadEditRecipeImage(editRecipeImage);
+                } catch (error) {
+                    console.error('Error uploading new image:', error);
+                    Alert.alert('Vërejtje', 'Fotoja nuk u ngarkua, por receta do të përditësohet.');
                 }
             }
+
+            const updatedRecipeData = {
+                name: editRecipeName.trim(),
+                perberesit: ingredientsArray,
+                instructions: editRecipeInstructions.trim(),
+                image: imageUrl
+            };
+
+            // Update in backend if it has a server ID
+            if (editingRecipe._id) {
+                try {
+                    const response = await axios.patch(`${getApiBaseUrl()}/recipes/${editingRecipe._id}`, updatedRecipeData);
+                    console.log('Recipe updated on server:', response.data);
+                } catch (error) {
+                    console.error('Failed to update recipe on server:', error);
+                }
+            }
+
+            // Update local state
+            const updatedRecipes = savedRecipes.map(recipe => 
+                recipe.id === editingRecipe.id 
+                    ? { 
+                        ...recipe, 
+                        name: editRecipeName.trim(),
+                        ingredients: ingredientsArray,
+                        instructions: editRecipeInstructions.trim(),
+                        image: imageUrl
+                    }
+                    : recipe
+            );
+
+            setSavedRecipes(updatedRecipes);
             
-            Alert.alert('Sukses', 'Receta u hoq nga të ruajturat');
-        } catch (e) {
-            console.error("Failed to unsave recipe", e);
-            Alert.alert('Gabim', 'Ndodhi një gabim gjatë heqjes së recetës');
-            loadSavedData();
+            // Update local storage
+            const currentUser = auth.currentUser;
+            if (currentUser) {
+                await AsyncStorage.setItem(`${SAVED_RECIPES_KEY}_${currentUser.uid}`, JSON.stringify(updatedRecipes));
+            }
+
+            // Update viewing recipe if it's the same one
+            if (viewingRecipe && viewingRecipe.id === editingRecipe.id) {
+                setViewingRecipe({
+                    ...viewingRecipe,
+                    name: editRecipeName.trim(),
+                    ingredients: ingredientsArray,
+                    instructions: editRecipeInstructions.trim(),
+                    image: imageUrl
+                });
+            }
+
+            closeEditModal();
+            Alert.alert('Sukses', 'Receta u përditësua me sukses!');
+        } catch (error) {
+            console.error('Error updating recipe:', error);
+            Alert.alert('Gabim', 'Ndodhi një gabim gjatë përditësimit të recetës.');
+        } finally {
+            setIsUpdatingRecipe(false);
         }
     };
 
@@ -409,12 +593,20 @@ export default function MyRecipesScreen() {
                         <Text style={styles.detailTitle} numberOfLines={1} ellipsizeMode='tail'>
                             {viewingRecipe.name}
                         </Text>
-                        <TouchableOpacity
-                            onPress={() => handleUnsaveRecipe(viewingRecipe)}
-                            style={styles.detailHeartButton}
-                        >
-                            <Ionicons name="trash-outline" size={24} color="#333" />
-                        </TouchableOpacity>
+                        <View style={styles.detailActionButtons}>
+                            <TouchableOpacity
+                                onPress={() => openEditModal(viewingRecipe)}
+                                style={styles.editButton}
+                            >
+                                <Ionicons name="create-outline" size={24} color="#007AFF" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => handleUnsaveRecipe(viewingRecipe)}
+                                style={styles.deleteButton}
+                            >
+                                <Ionicons name="trash-outline" size={24} color="#FF3B30" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     <View style={styles.detailContentWrapper}>
@@ -505,15 +697,26 @@ export default function MyRecipesScreen() {
                                                 style={styles.recipeImage}
                                                 imageStyle={styles.imageStyle}
                                             >
-                                                <TouchableOpacity
-                                                    style={styles.heartButton}
-                                                    onPress={(e) => {
-                                                        e.stopPropagation();
-                                                        handleUnsaveRecipe(item);
-                                                    }}
-                                                >
-                                                    <Ionicons name="trash-outline" size={24} color="white" />
-                                                </TouchableOpacity>
+                                                <View style={styles.recipeCardActions}>
+                                                    <TouchableOpacity
+                                                        style={styles.cardEditButton}
+                                                        onPress={(e) => {
+                                                            e.stopPropagation();
+                                                            openEditModal(item);
+                                                        }}
+                                                    >
+                                                        <Ionicons name="create-outline" size={20} color="#007AFF" />
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        style={styles.cardDeleteButton}
+                                                        onPress={(e) => {
+                                                            e.stopPropagation();
+                                                            handleUnsaveRecipe(item);
+                                                        }}
+                                                    >
+                                                        <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                                                    </TouchableOpacity>
+                                                </View>
                                                 <View style={styles.imageOverlay}>
                                                     <Text style={styles.recipeName} numberOfLines={2}>{item.name}</Text>
                                                     <View style={styles.recipeFooter}>
@@ -549,6 +752,113 @@ export default function MyRecipesScreen() {
                     </View>
                 </ScrollView>
             )}
+            
+            {/* Edit Recipe Modal */}
+            <Modal
+                visible={editModalVisible}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={closeEditModal}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <TouchableOpacity onPress={closeEditModal} style={styles.modalCloseButton}>
+                            <Ionicons name="close" size={24} color="#333" />
+                        </TouchableOpacity>
+                        <Text style={styles.modalTitle}>Përditëso Recetën</Text>
+                        <View style={styles.modalPlaceholder} />
+                    </View>
+
+                    <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+                        <View style={styles.formSection}>
+                            <Text style={styles.inputLabel}>Emri i Recetës<Text style={styles.requiredStar}>*</Text></Text>
+                            <TextInput
+                                placeholder="Shkruani emrin e recetës"
+                                style={styles.input}
+                                value={editRecipeName}
+                                onChangeText={setEditRecipeName}
+                                maxLength={50}
+                            />
+                            <Text style={styles.characterCount}>{editRecipeName.length}/50</Text>
+                        </View>
+
+                        <View style={styles.formSection}>
+                            <Text style={styles.inputLabel}>Përbërësit<Text style={styles.requiredStar}>*</Text></Text>
+                            <Text style={styles.inputHelper}>Shkruani çdo përbërës në një rresht të ri</Text>
+                            <TextInput
+                                placeholder="P.sh.\n2 vezë\n100g miell\n50ml qumësht\n..."
+                                style={[styles.input, styles.recipeTextArea]}
+                                value={editRecipeIngredients}
+                                onChangeText={setEditRecipeIngredients}
+                                multiline
+                                numberOfLines={5}
+                                textAlignVertical="top"
+                            />
+                            {editRecipeIngredients.trim() ? (
+                                <Text style={styles.ingredientCount}>
+                                    {editRecipeIngredients.split('\n').filter(line => line.trim().length > 0).length} përbërës
+                                </Text>
+                            ) : null}
+                        </View>
+
+                        <View style={styles.formSection}>
+                            <Text style={styles.inputLabel}>Udhëzimet<Text style={styles.requiredStar}>*</Text></Text>
+                            <Text style={styles.inputHelper}>Përshkruani hapat e përgatitjes së recetës</Text>
+                            <TextInput
+                                placeholder="Përshkruani procesin e përgatitjes hap pas hapi..."
+                                style={[styles.input, styles.recipeTextArea, styles.instructionsArea]}
+                                value={editRecipeInstructions}
+                                onChangeText={setEditRecipeInstructions}
+                                multiline
+                                numberOfLines={8}
+                                textAlignVertical="top"
+                            />
+                        </View>
+
+                        <View style={styles.formSection}>
+                            <Text style={styles.inputLabel}>Foto e Recetës</Text>
+                            <Text style={styles.inputHelper}>Shtoni një foto të gatimit përfundimtar (opsionale)</Text>
+
+                            <TouchableOpacity
+                                style={styles.uploadPhotoButton}
+                                onPress={pickEditRecipeImage}
+                            >
+                                <Ionicons name="camera" size={20} color="#fff" />
+                                <Text style={styles.uploadPhotoText}>Ngarko foto të recetës</Text>
+                            </TouchableOpacity>
+
+                            {editRecipeImage ? (
+                                <View style={styles.uploadedImageContainer}>
+                                    <Image source={{ uri: editRecipeImage }} style={styles.recipePreviewImage} />
+                                    <TouchableOpacity
+                                        style={styles.removeImageButton}
+                                        onPress={() => setEditRecipeImage(null)}
+                                    >
+                                        <Ionicons name="close-circle" size={24} color="#FF3B30" />
+                                    </TouchableOpacity>
+                                </View>
+                            ) : null}
+                        </View>
+                    </ScrollView>
+
+                    <View style={styles.modalFooter}>
+                        <TouchableOpacity
+                            style={[styles.updateButton, isUpdatingRecipe && styles.updateButtonDisabled]}
+                            onPress={handleUpdateRecipe}
+                            disabled={isUpdatingRecipe}
+                        >
+                            {isUpdatingRecipe ? (
+                                <View style={styles.saveButtonContent}>
+                                    <ActivityIndicator size="small" color="#fff" />
+                                    <Text style={[styles.updateButtonText, styles.savingText]}>Duke përditësuar...</Text>
+                                </View>
+                            ) : (
+                                <Text style={styles.updateButtonText}>Përditëso Recetën</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </ImageBackground>
     );
 }
@@ -895,6 +1205,173 @@ const styles = StyleSheet.create({
         top: 8,
         right: 8,
         backgroundColor: 'rgba(0,0,0,0.4)',
+        borderRadius: 20,
+        padding: 6,
+        zIndex: 10,
+    },
+    detailActionButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    editButton: {
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        borderRadius: 20,
+        padding: 8,
+        zIndex: 10,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+        elevation: 3,
+    },
+    deleteButton: {
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        borderRadius: 20,
+        padding: 8,
+        zIndex: 10,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+        elevation: 3,
+    },
+    modalContainer: {
+        flex: 1,
+        backgroundColor: 'white',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 15,
+    },
+    modalCloseButton: {
+        padding: 8,
+    },
+    modalTitle: {
+        flex: 1,
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    modalPlaceholder: {
+        width: 36,
+        height: 36,
+    },
+    modalContent: {
+        padding: 15,
+    },
+    formSection: {
+        marginBottom: 20,
+    },
+    inputLabel: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 8,
+    },
+    input: {
+        padding: 10,
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+    },
+    requiredStar: {
+        color: 'red',
+    },
+    inputHelper: {
+        fontSize: 14,
+        color: '#555',
+    },
+    recipeTextArea: {
+        height: 100,
+    },
+    instructionsArea: {
+        height: 200,
+    },
+    characterCount: {
+        fontSize: 14,
+        color: '#555',
+        textAlign: 'right',
+    },
+    ingredientCount: {
+        fontSize: 14,
+        color: '#555',
+        textAlign: 'right',
+    },
+    uploadPhotoButton: {
+        padding: 10,
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        backgroundColor: '#007AFF',
+        alignItems: 'center',
+    },
+    uploadPhotoText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: 'white',
+    },
+    uploadedImageContainer: {
+        marginBottom: 10,
+    },
+    recipePreviewImage: {
+        width: '100%',
+        height: 200,
+        borderRadius: 8,
+    },
+    removeImageButton: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        borderRadius: 20,
+        padding: 6,
+    },
+    modalFooter: {
+        padding: 15,
+        borderTopWidth: 1,
+        borderTopColor: '#ddd',
+        alignItems: 'center',
+    },
+    updateButton: {
+        padding: 12,
+        backgroundColor: '#007AFF',
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    updateButtonDisabled: {
+        backgroundColor: '#ddd',
+    },
+    saveButtonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    updateButtonText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: 'white',
+    },
+    savingText: {
+        color: '#555',
+    },
+    recipeCardActions: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    cardEditButton: {
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        borderRadius: 20,
+        padding: 6,
+        zIndex: 10,
+    },
+    cardDeleteButton: {
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
         borderRadius: 20,
         padding: 6,
         zIndex: 10,

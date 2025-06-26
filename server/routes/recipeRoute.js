@@ -190,4 +190,23 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+// Delete recipe by ID
+router.delete('/:id', async (req, res) => {
+  try {
+    console.log(`DELETE /${req.params.id} - Deleting recipe`);
+    
+    const recipe = await Recipe.findByIdAndDelete(req.params.id);
+    
+    if (!recipe) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+    
+    console.log(`Recipe deleted: ${recipe.name}`);
+    res.json({ message: 'Recipe deleted successfully', deletedRecipe: recipe });
+  } catch (error) {
+    console.error('Error deleting recipe:', error);
+    res.status(500).json({ error: 'Failed to delete recipe' });
+  }
+});
+
 module.exports = router;
